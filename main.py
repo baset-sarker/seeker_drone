@@ -53,9 +53,9 @@ def run_command_on_drone(command_data):
                 send_command = False 
                 run_command(command,int(value),tello)
                 send_command = True
-            except:
+            except Exception as e:
                 send_command = True
-                pass
+                #print(e)
         else:
             send_command = True
             print("Command is None")
@@ -164,11 +164,8 @@ def detect(save_img=False):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
 
-                # Print results
-                # for c in det[:, -1].unique():
-                #     n = (det[:, -1] == c).sum()  # detections per class
-                #     s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
 
+                # image center , drone middle position marking
                 dx1,dy1 = int(im0.shape[1]/2), int(im0.shape[0])
                 cv2.circle(img=im0, center = (dx1,dy1), radius =5, color =(255,255,0), thickness=5)
 
@@ -177,18 +174,25 @@ def detect(save_img=False):
 
                     xywhs = (xyxy2xywh(torch.tensor(xyxy).view(1, 4))).view(-1).tolist() 
                     center = get_center(xywhs)
+                    distance = get_distance(center, (dx1,dy1))
+                    angle = get_angle(center, (dx1,dy1))
+                    area = get_area(xywhs)    
+
                     
                     cv2.circle(img=im0, center = get_center(xywhs), radius =10, color =(255,0,0), thickness=5)
                     cv2.line(img=im0, pt1=center, pt2=(dx1,dy1), color=colors[int(cls)], thickness=1)
+                    cv2.putText(im0,f'D:{distance:.2f}  A:{angle:.2f}',org=(dx1,dy1-10),fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=colors[int(cls)], thickness=1)
+                    
 
-                    distance = get_distance(center, (dx1,dy1))
-                    angle = get_angle(center, (dx1,dy1))
-                    area = get_area(xywhs)
-                    manage_drone(command_data,distance, angle, area)
+                    #command = manage_drone(command_data,distance, angle, area)
+                    #command_data.put(command)
                 
                     if save_img or view_img:  # Add bbox to image
-                        label = f'{names[int(cls)]} {conf:.2f} d:{distance:.2f} a:{angle:.2f}'
+                        label = f'{int(cls)} {names[int(cls)]} {conf:.2f} D:{distance:.2f} A:{angle:.2f}'
                         plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
+            else:
+                #command_data.put("rotate_clockwise:10")
+                print("rotate clockwise")
 
             # Print time (inference + NMS)
             print(f'{s}Done. ({(1E3 * (t2 - t1)):.1f}ms) Inference, ({(1E3 * (t3 - t2)):.1f}ms) NMS')
@@ -199,7 +203,7 @@ def detect(save_img=False):
                 cv2.imshow(str(p), im0)
                 #cv2.waitKey(1)  # 1 millisecond
                 key = cv2.waitKey(1) & 0xff
-                if key == 27 or key == ord('q'): # ESC
+                if key == 27 or key == ord('q'): # ESC or q to quit
                     run_process = False
                     tello.end()
                     cv2.destroyAllWindows()
