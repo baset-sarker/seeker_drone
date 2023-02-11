@@ -21,13 +21,15 @@ import queue
 command_data = queue.Queue()
 drone_command = False
 
+
 from DJITelloPy.djitellopy import Tello
 
 import threading,sys
 # #import imutils
 # import sys
-run_process = True
 
+run_process = True
+send_command = True
 # Initialize the Tello drone
 tello = Tello()
 #tello.connect()
@@ -40,20 +42,29 @@ tello = Tello()
 
 
 def run_command_on_drone(command_data):
-    global run_process
-    # Get the data from the queue
-    while run_process:
-        try:
-            command, value = command_data.get().split(":")
-            run_command(command,int(value),tello)
-        except:
-            pass
+    global run_process,send_command
+    
+    while True:
+        print("====================State ",send_command)
+        command, value = command_data.get().split(":")
 
-        # if not run_process:
-        #     break
+        if command is not None and send_command is True:
+            try: 
+                send_command = False 
+                run_command(command,int(value),tello)
+                send_command = True
+            except:
+                send_command = True
+                pass
+        else:
+            send_command = True
+            print("Command is None")
+        
+
+        if not run_process:
+            break
 
   
-        
 
 def detect(save_img=False):
     source, weights, view_img, save_txt, imgsz, trace = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size, not opt.no_trace
@@ -173,7 +184,7 @@ def detect(save_img=False):
                     distance = get_distance(center, (dx1,dy1))
                     angle = get_angle(center, (dx1,dy1))
                     area = get_area(xywhs)
-                    print("center",center,"distance=",distance, "angle=",angle,"area=",area)
+                    #print("center",center,"distance=",distance, "angle=",angle,"area=",area)
         
                     # if save_txt:  # Write to file
                     #     xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
@@ -186,7 +197,8 @@ def detect(save_img=False):
                         plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
 
             # Print time (inference + NMS)
-            print(f'{s}Done. ({(1E3 * (t2 - t1)):.1f}ms) Inference, ({(1E3 * (t3 - t2)):.1f}ms) NMS')
+            #print(f'{s}Done. ({(1E3 * (t2 - t1)):.1f}ms) Inference, ({(1E3 * (t3 - t2)):.1f}ms) NMS')
+            print("send command to status",send_command)
 
             # Stream results
             if view_img:
@@ -201,7 +213,13 @@ def detect(save_img=False):
                     return 1
 
                 if key == ord('w'):
-                    command_data.put("move_up:20")
+                    command_data.put("move_up:10")
+                if key == ord('a'):
+                    command_data.put("move_left:10")
+                if key == ord('s'):
+                    command_data.put("move_down:10")
+                if key == ord('d'):
+                    command_data.put("move_right:10")
                 
                     #print("I am here")
 
@@ -231,6 +249,7 @@ def detect(save_img=False):
         #print(f"Results saved to {save_dir}{s}")
 
     print(f'Done. ({time.time() - t0:.3f}s)')
+    
 
 
 if __name__ == '__main__':
@@ -259,10 +278,13 @@ if __name__ == '__main__':
 
 
     with torch.no_grad():
+        drone = threading.Thread(target=detect)
+        drone.start()
+
         drone_command = threading.Thread(target=run_command_on_drone, args=(command_data,))
         drone_command.start()
     
-        detect()
+        # detect()
 
         # if opt.update:  # update all models (to fix SourceChangeWarning)
         #     for opt.weights in ['yolov7.pt']:

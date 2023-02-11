@@ -5,9 +5,11 @@ def run_command(command,x,tello):
     print(command,x)    
     if command == "takeoff":
         tello.takeoff()
+        return True
 
     if command == "land":
         tello.land()
+        return True
 
     if  command == "move_up":
         """Fly x cm up.
@@ -15,6 +17,7 @@ def run_command(command,x,tello):
             x: 20-500
         """
         tello.move_up(x)
+        return True
         
 
 
@@ -24,6 +27,7 @@ def run_command(command,x,tello):
             x: 20-500
         """
         tello.move_down(x)
+        return True
         
 
     if  command == "move_left":
@@ -32,6 +36,7 @@ def run_command(command,x,tello):
             x: 20-500
         """
         tello.move_left(x)
+        return True
         
 
     if  command == "move_right":
@@ -40,6 +45,7 @@ def run_command(command,x,tello):
             x: 20-500
         """
         tello.move_right(x)
+        return True
         
 
     if  command == "move_forward":
@@ -48,6 +54,7 @@ def run_command(command,x,tello):
             x: 20-500
         """
         tello.move_forward(x)
+        return True
         
 
     if  command == "move_back":
@@ -56,6 +63,7 @@ def run_command(command,x,tello):
             x: 20-500
         """
         tello.move_back(x)
+        return True
         
 
     if  command == "rotate_clockwise":
@@ -64,6 +72,7 @@ def run_command(command,x,tello):
             x: 1-360
         """
         tello.rotate_clockwise(x)
+        return True
         
 
     if  command == "rotate_counter_clockwise":
@@ -72,6 +81,7 @@ def run_command(command,x,tello):
             x: 1-3600
         """
         tello.rotate_counter_clockwise(x)
+        return True
 
     if command == "set_speed":
         """Set speed to x cm/s.
@@ -79,9 +89,13 @@ def run_command(command,x,tello):
             x: 10-100
         """
         tello.set_speed(x)
+        return True
 
     if  command == "end":
         tello.end()
+        return True
+
+    return True
 
 
     
