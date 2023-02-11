@@ -15,12 +15,16 @@ from utils.general import check_img_size, check_requirements, check_imshow, non_
 from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized, TracedModel
 
-from helper_function import run_command_to_drone,get_area,get_center,get_distance,get_angle
+from helper_function import run_command,get_area,get_center,get_distance,get_angle
+import queue
+
+command_data = queue.Queue()
+drone_command = False
 
 from DJITelloPy.djitellopy import Tello
+
+import threading,sys
 # #import imutils
-# import queue
-# import threading
 # import sys
 run_process = True
 
@@ -35,12 +39,28 @@ tello = Tello()
 #tello.streamon()
 
 
+def run_command_on_drone(command_data):
+    global run_process
+    # Get the data from the queue
+    while run_process:
+        try:
+            command, value = command_data.get().split(":")
+            run_command(command,int(value),tello)
+        except:
+            pass
+
+        # if not run_process:
+        #     break
+
+  
+        
+
 def detect(save_img=False):
     source, weights, view_img, save_txt, imgsz, trace = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size, not opt.no_trace
     save_img = not opt.nosave and not source.endswith('.txt')  # save inference images
     webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
         ('rtsp://', 'rtmp://', 'http://', 'https://'))
-    global run_process
+    global run_process,command_data,drone_command
 
     # Directories
     save_dir = Path(increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok))  # increment run
@@ -175,10 +195,15 @@ def detect(save_img=False):
                 key = cv2.waitKey(1) & 0xff
                 if key == 27 or key == ord('q'): # ESC
                     run_process = False
+                    #drone_command.join()
                     tello.end()
+                    cv2.destroyAllWindows()
                     return 1
+
                 if key == ord('w'):
-                    print("I am here")
+                    command_data.put("move_up:20")
+                
+                    #print("I am here")
 
             # Save results (image with detections)
             #if save_img:
@@ -234,7 +259,11 @@ if __name__ == '__main__':
 
 
     with torch.no_grad():
+        drone_command = threading.Thread(target=run_command_on_drone, args=(command_data,))
+        drone_command.start()
+    
         detect()
+
         # if opt.update:  # update all models (to fix SourceChangeWarning)
         #     for opt.weights in ['yolov7.pt']:
         #         detect()
