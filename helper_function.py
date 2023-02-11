@@ -97,8 +97,6 @@ def run_command(command,x,tello):
 
     return True
 
-
-    
         
 
 def get_area(xywh):
@@ -117,3 +115,8 @@ def get_angle(pointA, pointB):
   changeInX = pointB[0] - pointA[0]
   changeInY = pointB[1] - pointA[1]
   return degrees(atan2(changeInY,changeInX))
+
+
+def manage_drone(command_data,distance, angle, area):
+
+    return 1

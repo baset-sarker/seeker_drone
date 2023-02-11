@@ -15,7 +15,7 @@ from utils.general import check_img_size, check_requirements, check_imshow, non_
 from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized, TracedModel
 
-from helper_function import run_command,get_area,get_center,get_distance,get_angle
+from helper_function import run_command,get_area,get_center,get_distance,get_angle,manage_drone
 import queue
 
 command_data = queue.Queue()
@@ -170,7 +170,7 @@ def detect(save_img=False):
                 #     s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
 
                 dx1,dy1 = int(im0.shape[1]/2), int(im0.shape[0])
-                cv2.circle(img=im0, center = (dx1,dy1), radius =5, color =(255,255,0), thickness=10)
+                cv2.circle(img=im0, center = (dx1,dy1), radius =5, color =(255,255,0), thickness=5)
 
                 # Write results
                 for *xyxy, conf, cls in reversed(det):
@@ -178,27 +178,21 @@ def detect(save_img=False):
                     xywhs = (xyxy2xywh(torch.tensor(xyxy).view(1, 4))).view(-1).tolist() 
                     center = get_center(xywhs)
                     
-                    cv2.circle(img=im0, center = get_center(xywhs), radius =10, color =(255,0,0), thickness=10)
+                    cv2.circle(img=im0, center = get_center(xywhs), radius =10, color =(255,0,0), thickness=5)
                     cv2.line(img=im0, pt1=center, pt2=(dx1,dy1), color=colors[int(cls)], thickness=1)
 
                     distance = get_distance(center, (dx1,dy1))
                     angle = get_angle(center, (dx1,dy1))
                     area = get_area(xywhs)
-                    #print("center",center,"distance=",distance, "angle=",angle,"area=",area)
-        
-                    # if save_txt:  # Write to file
-                    #     xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
-                    #     line = (cls, *xywh, conf) if opt.save_conf else (cls, *xywh)  # label format
-                    #     with open(txt_path + '.txt', 'a') as f:
-                    #         f.write(('%g ' * len(line)).rstrip() % line + '\n')
-
+                    manage_drone(command_data,distance, angle, area)
+                
                     if save_img or view_img:  # Add bbox to image
                         label = f'{names[int(cls)]} {conf:.2f} d:{distance:.2f} a:{angle:.2f}'
                         plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
 
             # Print time (inference + NMS)
-            #print(f'{s}Done. ({(1E3 * (t2 - t1)):.1f}ms) Inference, ({(1E3 * (t3 - t2)):.1f}ms) NMS')
-            print("send command to status",send_command)
+            print(f'{s}Done. ({(1E3 * (t2 - t1)):.1f}ms) Inference, ({(1E3 * (t3 - t2)):.1f}ms) NMS')
+            #print("send command to status",send_command)
 
             # Stream results
             if view_img:
@@ -207,42 +201,19 @@ def detect(save_img=False):
                 key = cv2.waitKey(1) & 0xff
                 if key == 27 or key == ord('q'): # ESC
                     run_process = False
-                    #drone_command.join()
                     tello.end()
                     cv2.destroyAllWindows()
                     return 1
 
                 if key == ord('w'):
-                    command_data.put("move_up:10")
+                    command_data.put("move_up:20")
                 if key == ord('a'):
-                    command_data.put("move_left:10")
+                    command_data.put("move_left:20")
                 if key == ord('s'):
-                    command_data.put("move_down:10")
+                    command_data.put("move_down:20")
                 if key == ord('d'):
-                    command_data.put("move_right:10")
-                
-                    #print("I am here")
+                    command_data.put("move_right:20")
 
-            # Save results (image with detections)
-            #if save_img:
-            #    pass
-                # if dataset.mode == 'image':
-                #     cv2.imwrite(save_path, im0)
-                #     print(f" The image with the result is saved in: {save_path}")
-                # else:  # 'video' or 'stream'
-                #     if vid_path != save_path:  # new video
-                #         vid_path = save_path
-                #         if isinstance(vid_writer, cv2.VideoWriter):
-                #             vid_writer.release()  # release previous video writer
-                #         if vid_cap:  # video
-                #             fps = vid_cap.get(cv2.CAP_PROP_FPS)
-                #             w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                #             h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                #         else:  # stream
-                #             fps, w, h = 30, im0.shape[1], im0.shape[0]
-                #             save_path += '.mp4'
-                #         vid_writer = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
-                #     vid_writer.write(im0)
 
     if save_txt or save_img:
         s = f"\n{len(list(save_dir.glob('labels/*.txt')))} labels saved to {save_dir / 'labels'}" if save_txt else ''
