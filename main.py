@@ -15,6 +15,7 @@ from utils.general import check_img_size, check_requirements, check_imshow, non_
 from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized, TracedModel
 
+from helper_function import run_command_to_drone,get_area,get_center,get_distance,get_angle
 
 from DJITelloPy.djitellopy import Tello
 # #import imutils
@@ -33,41 +34,13 @@ tello = Tello()
 
 #tello.streamon()
 
-def run_drone(command_data):
-    global run_process,tello
-    # Get the data from the queue
-    while True and run_process:
-        data = command_data.get()
-        if data == "go_up":
-            tello.takeoff()
-        if data == "rotate":
-           tello.rotate_clockwise(30) 
-        if data == "land":
-            tello.land()
-        print(data)
-
-def get_area(xywh):
-    x, y, w, h = xywh
-    return (w - x) * (h - y)
-
-def get_center(xywh):
-    x, y, w, h = xywh
-    return (int(x),int(y))
-
-def get_distance(p, q):
-    return math.dist(p, q)
-
-
-def get_angle(pointA, pointB):
-  changeInX = pointB[0] - pointA[0]
-  changeInY = pointB[1] - pointA[1]
-  return degrees(atan2(changeInY,changeInX))
 
 def detect(save_img=False):
     source, weights, view_img, save_txt, imgsz, trace = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size, not opt.no_trace
     save_img = not opt.nosave and not source.endswith('.txt')  # save inference images
     webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
         ('rtsp://', 'rtmp://', 'http://', 'https://'))
+    global run_process
 
     # Directories
     save_dir = Path(increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok))  # increment run
@@ -171,21 +144,16 @@ def detect(save_img=False):
                 # Write results
                 for *xyxy, conf, cls in reversed(det):
 
-                    # xywhs = xyxy2xywh(det[:, 0:4])
-                    # # confs = det[:, 4]
-                    # # clss = det[:, 5]
-                    # xywhs =  xywhs.tolist()# normalized xywh
                     xywhs = (xyxy2xywh(torch.tensor(xyxy).view(1, 4))).view(-1).tolist() 
-                    print("center of object", get_center(xywhs))
                     center = get_center(xywhs)
-                    # print(center)
+                    
                     cv2.circle(img=im0, center = get_center(xywhs), radius =10, color =(255,0,0), thickness=10)
                     cv2.line(img=im0, pt1=center, pt2=(dx1,dy1), color=colors[int(cls)], thickness=1)
 
                     distance = get_distance(center, (dx1,dy1))
                     angle = get_angle(center, (dx1,dy1))
                     area = get_area(xywhs)
-                    print("distance=",distance, "angle=",angle,"area=",area)
+                    print("center",center,"distance=",distance, "angle=",angle,"area=",area)
         
                     # if save_txt:  # Write to file
                     #     xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
@@ -207,7 +175,7 @@ def detect(save_img=False):
                 key = cv2.waitKey(1) & 0xff
                 if key == 27 or key == ord('q'): # ESC
                     run_process = False
-                    #tello.end()
+                    tello.end()
                     return 1
                 if key == ord('w'):
                     print("I am here")
@@ -266,9 +234,10 @@ if __name__ == '__main__':
 
 
     with torch.no_grad():
-        if opt.update:  # update all models (to fix SourceChangeWarning)
-            for opt.weights in ['yolov7.pt']:
-                detect()
-                strip_optimizer(opt.weights)
-        else:
-            detect()
+        detect()
+        # if opt.update:  # update all models (to fix SourceChangeWarning)
+        #     for opt.weights in ['yolov7.pt']:
+        #         detect()
+        #         strip_optimizer(opt.weights)
+        # else:
+        #     detect()
