@@ -30,8 +30,8 @@ battery_level = 0
 
 # Initialize the Tello drone
 tello = Tello()
-tello.RESPONSE_TIMEOUT = 2
-tello.RETRY_COUNT = 2
+# tello.RESPONSE_TIMEOUT = 2
+# tello.RETRY_COUNT = 2
 #tello.connect()
 
 #tello.takeoff()
@@ -58,7 +58,7 @@ def run_command_on_drone(command_data):
                 send_command = False 
                 res = run_command(command,int(value),tello)
                 send_command = True
-                if command == "get_battery" and int(res) is not None:
+                if command == "get_battery" and res.isnumeric():
                     battery_level = res
             except Exception as e:
                 send_command = True
@@ -232,9 +232,10 @@ def detect(save_img=False):
 
     if save_txt or save_img:
         s = f"\n{len(list(save_dir.glob('labels/*.txt')))} labels saved to {save_dir / 'labels'}" if save_txt else ''
-        #print(f"Results saved to {save_dir}{s}")
+        print(f"Results saved to {save_dir}{s}")
 
     print(f'Done. ({time.time() - t0:.3f}s)')
+    
     
 
 
