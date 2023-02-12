@@ -15,23 +15,23 @@ from utils.general import check_img_size, check_requirements, check_imshow, non_
 from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized, TracedModel
 
-from helper_function import run_command,get_area,get_center,get_distance,get_angle,manage_drone
+from helper_function import run_command,get_area,get_center,get_distance,get_angle,decide_drone_movement
 import queue
-
-command_data = queue.Queue()
-drone_command = False
-
-
 from DJITelloPy.djitellopy import Tello
-
 import threading,sys
 # #import imutils
 # import sys
 
 run_process = True
 send_command = True
+command_data = queue.Queue()
+drone_command = False
+battery_level = 0
+
 # Initialize the Tello drone
 tello = Tello()
+tello.RESPONSE_TIMEOUT = 2
+tello.RETRY_COUNT = 2
 #tello.connect()
 
 #tello.takeoff()
@@ -41,18 +41,25 @@ tello = Tello()
 #tello.streamon()
 
 
+
 def run_command_on_drone(command_data):
-    global run_process,send_command
+    global run_process,send_command,battery_level
     
     while True:
-        print("====================State ",send_command)
-        command, value = command_data.get().split(":")
+        data = command_data.get()
+        if ":" in data:
+            command, value = data.split(":")
+        else:
+            command = data
+            value = 0
 
         if command is not None and send_command is True:
             try: 
                 send_command = False 
-                run_command(command,int(value),tello)
+                res = run_command(command,int(value),tello)
                 send_command = True
+                if command == "get_battery":
+                    battery_level = res
             except Exception as e:
                 send_command = True
                 #print(e)
@@ -71,7 +78,7 @@ def detect(save_img=False):
     save_img = not opt.nosave and not source.endswith('.txt')  # save inference images
     webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
         ('rtsp://', 'rtmp://', 'http://', 'https://'))
-    global run_process,command_data,drone_command
+    global run_process,command_data,drone_command,battery_level
 
     # Directories
     save_dir = Path(increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok))  # increment run
@@ -166,6 +173,7 @@ def detect(save_img=False):
 
 
                 # image center , drone middle position marking
+                im_w,im_h = im0.shape[1],im0.shape[0]
                 dx1,dy1 = int(im0.shape[1]/2), int(im0.shape[0])
                 cv2.circle(img=im0, center = (dx1,dy1), radius =5, color =(255,255,0), thickness=5)
 
@@ -182,9 +190,10 @@ def detect(save_img=False):
                     cv2.circle(img=im0, center = get_center(xywhs), radius =10, color =(255,0,0), thickness=5)
                     cv2.line(img=im0, pt1=center, pt2=(dx1,dy1), color=colors[int(cls)], thickness=1)
                     cv2.putText(im0,f'D:{distance:.2f}  A:{angle:.2f}',org=(dx1,dy1-10),fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=colors[int(cls)], thickness=1)
+                    cv2.putText(im0,f'Bat:{battery_level}%',org=(im_w-75,15),fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=(255,255,0), thickness=1)
                     
 
-                    #command = manage_drone(command_data,distance, angle, area)
+                    #command = decide_drone_movement(command_data,distance, angle, area)
                     #command_data.put(command)
                 
                     if save_img or view_img:  # Add bbox to image
@@ -195,7 +204,7 @@ def detect(save_img=False):
                 print("rotate clockwise")
 
             # Print time (inference + NMS)
-            print(f'{s}Done. ({(1E3 * (t2 - t1)):.1f}ms) Inference, ({(1E3 * (t3 - t2)):.1f}ms) NMS')
+            #print(f'{s}Done. ({(1E3 * (t2 - t1)):.1f}ms) Inference, ({(1E3 * (t3 - t2)):.1f}ms) NMS')
             #print("send command to status",send_command)
 
             # Stream results
@@ -217,6 +226,8 @@ def detect(save_img=False):
                     command_data.put("move_down:20")
                 if key == ord('d'):
                     command_data.put("move_right:20")
+                if key == ord('b'):
+                    command_data.put("get_battery")
 
 
     if save_txt or save_img:

@@ -95,6 +95,9 @@ def run_command(command,x,tello):
         tello.end()
         return True
 
+    if command == "get_battery":
+        return tello.get_battery()
+        
     return True
 
         
@@ -117,7 +120,7 @@ def get_angle(pointA, pointB):
   return degrees(atan2(changeInY,changeInX))
 
 
-def manage_drone(distance, angle, area):
+def decide_drone_movement(distance, angle, area):
     # check if object is closer than 100 cm
     if distance < 100 and (angle >= 80 and angle <= 100):
        return "land"
