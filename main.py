@@ -58,11 +58,11 @@ def run_command_on_drone(command_data):
                 send_command = False 
                 res = run_command(command,int(value),tello)
                 send_command = True
-                if command == "get_battery":
+                if command == "get_battery" and int(res) is not None:
                     battery_level = res
             except Exception as e:
                 send_command = True
-                #print(e)
+                print(e)
         else:
             send_command = True
             print("Command is None")
