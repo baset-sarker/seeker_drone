@@ -27,19 +27,7 @@ send_command = True
 command_data = queue.Queue()
 drone_command = False
 battery_level = 0
-
-# Initialize the Tello drone
-tello = Tello()
-# tello.RESPONSE_TIMEOUT = 2
-# tello.RETRY_COUNT = 2
-#tello.connect()
-
-#tello.takeoff()
-#tello.move_up(50)
-# Start the video stream
-
-#tello.streamon()
-
+tello = None
 
 
 def run_command_on_drone(command_data):
@@ -58,7 +46,7 @@ def run_command_on_drone(command_data):
                 send_command = False 
                 res = run_command(command,int(value),tello)
                 send_command = True
-                if command == "get_battery" and res.isnumeric():
+                if command == "get_battery" and int(res) is not None:
                     battery_level = res
             except Exception as e:
                 send_command = True
@@ -259,10 +247,27 @@ if __name__ == '__main__':
     parser.add_argument('--name', default='exp', help='save results to project/name')
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--no-trace', action='store_true', help='don`t trace model')
+    parser.add_argument('--no-drone', action='store_true', help='No drone')
     opt = parser.parse_args()
     print(opt)
     #check_requirements(exclude=('pycocotools', 'thop'))
+     
+    if opt.no_drone is False:
+        # Initialize the Tello drone
+        tello = Tello()
+        tello.connect()
+        tello.set_video_fps(tello.FPS_15)
+        tello.set_video_resolution(tello.RESOLUTION_480P)
+        # tello.RESPONSE_TIMEOUT = 2
+        # tello.RETRY_COUNT = 2
 
+        #tello.takeoff()
+        #tello.move_up(50)
+        # Start the video stream
+
+        tello.streamon()
+        time.sleep(2)
+    
 
     with torch.no_grad():
         drone = threading.Thread(target=detect)
