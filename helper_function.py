@@ -1,8 +1,14 @@
 import time,math
 from math import atan2,degrees
 
-def run_command(command,x,tello):
-    print(command,x)    
+def run_command(command_str,tello):
+        
+    if ":" in command_str:
+        command, x = command_str.split(":")
+    else:
+        command,x = command_str,0
+    print(command,x)
+
     if command == "takeoff":
         tello.takeoff()
         return True
@@ -19,7 +25,6 @@ def run_command(command,x,tello):
         tello.move_up(x)
         return True
         
-
 
     if  command == "move_down":
         """Fly x cm down.
@@ -89,6 +94,11 @@ def run_command(command,x,tello):
             x: 10-100
         """
         tello.set_speed(x)
+        return True
+
+    if command == "landing_sequence":
+        tello.move_forward(100)
+        tello.land()
         return True
 
     if  command == "end":

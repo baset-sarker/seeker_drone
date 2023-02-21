@@ -23,51 +23,41 @@ import threading,sys
 # import sys
 
 run_process = True
-send_command = True
 drone_command = False
 battery_level = 0
 command_str = ""
 
   
 def run_tello():
+    global run_process,command_str,battery_level
     tello = Tello()
     tello.connect()
     tello.set_video_resolution(tello.RESOLUTION_480P)
     tello.set_video_fps(tello.FPS_30)
     tello.streamon()
+    battery_level = tello.get_battery()
     tello.takeoff()
+    
 
-    # if opt.update:  # update all models (to fix SourceChangeWarning)
-    #     for opt.weights in ['yolov7.pt']:
-    #         detect()
-    #         strip_optimizer(opt.weights)
-    # else:
-    #     detect()
-
-    state = 1
+    #state = 1
     while run_process:
         
         try:
             if command_str == "":
-                if state == 1:
-                    state = 2
-                    tello.move_up(20)
-                elif state == 2:
-                    state = 1
-                    tello.move_down(20)
+                tello.send_keepalive()
+                # if state == 1:
+                #     state = 2
+                #     tello.send_keepalive()
+                # elif state == 2:
+                #     state = 1
+                #     tello.move_down(20)
             else:
-                if ":" in command_str:
-                    command, value = command_str.split(":")
-                else:
-                    command,value = command_str,0
-
-                run_command(command,value,tello)
+                run_command(command_str,tello)
             
         except Exception as e:
             print("excetion",e)
         
         #time.sleep(0.05)
-
 
     try:
         tello.land()
@@ -225,7 +215,7 @@ def detect(save_img=False):
 
             # Print time (inference + NMS)
             #print(f'{s}Done. ({(1E3 * (t2 - t1)):.1f}ms) Inference, ({(1E3 * (t3 - t2)):.1f}ms) NMS')
-            #print("send command to status",send_command)
+        
 
             # Stream results
             if view_img:
@@ -234,7 +224,6 @@ def detect(save_img=False):
                 key = cv2.waitKey(1) & 0xff
                 if key == 27 or key == ord('q'): # ESC or q to quit
                     run_process = False
-                    #tello.end()
                     cv2.destroyAllWindows()
                     sys.exit()
             
@@ -290,6 +279,13 @@ if __name__ == '__main__':
 
 
     with torch.no_grad():
+        # if opt.update:  # update all models (to fix SourceChangeWarning)
+        #     for opt.weights in ['yolov7.pt']:
+        #         detect()
+        #         strip_optimizer(opt.weights)
+        # else:
+        #     detect()
+
         drone = threading.Thread(target=detect)
         drone.start()
         time.sleep(2)
