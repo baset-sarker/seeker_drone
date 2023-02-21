@@ -2,6 +2,9 @@ import time,math
 from math import atan2,degrees
 
 def run_command(command_str,tello):
+
+    if command_str == "":
+        tello.send_keepalive()
         
     if ":" in command_str:
         command, x = command_str.split(":")

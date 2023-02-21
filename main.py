@@ -38,24 +38,11 @@ def run_tello():
     battery_level = tello.get_battery()
     tello.takeoff()
     
-
-    #state = 1
-    while run_process:
-        
+    while run_process:        
         try:
-            if command_str == "":
-                tello.send_keepalive()
-                # if state == 1:
-                #     state = 2
-                #     tello.send_keepalive()
-                # elif state == 2:
-                #     state = 1
-                #     tello.move_down(20)
-            else:
-                run_command(command_str,tello)
-            
+            run_command(command_str,tello)
         except Exception as e:
-            print("excetion",e)
+            print("Exception:",e)
         
         #time.sleep(0.05)
 
@@ -72,7 +59,6 @@ def detect(save_img=False):
         ('rtsp://', 'rtmp://', 'http://', 'https://'))
     global run_process,drone_command,battery_level,command_str
     count_no_obj = 0
-    c = 0
 
     # Directories
     save_dir = Path(increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok))  # increment run
@@ -279,6 +265,7 @@ if __name__ == '__main__':
 
 
     with torch.no_grad():
+
         # if opt.update:  # update all models (to fix SourceChangeWarning)
         #     for opt.weights in ['yolov7.pt']:
         #         detect()
