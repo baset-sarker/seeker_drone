@@ -19,6 +19,7 @@ from helper_function import run_command,get_area,get_center,get_distance,get_ang
 import queue
 from DJITelloPy.djitellopy import Tello
 import threading,sys
+from statistics import mean
 # #import imutils
 # import sys
 
@@ -38,9 +39,20 @@ def run_tello():
     battery_level = tello.get_battery()
     tello.takeoff()
     
-    while run_process:        
+    t1 = time.time()
+    while run_process:  
+        command_data = command_str
+        command_str = ""      
         try:
-            run_command(command_str,tello)
+            if command_data == "":
+                t2 = time.time()
+                if t2 - t1 > 5:
+                    t1 = t2
+                    run_command(command_data,tello)
+                    battery_level = tello.get_battery()
+            else:
+                run_command(command_data,tello)
+
         except Exception as e:
             print("Exception:",e)
         
@@ -59,6 +71,7 @@ def detect(save_img=False):
         ('rtsp://', 'rtmp://', 'http://', 'https://'))
     global run_process,drone_command,battery_level,command_str
     count_no_obj = 0
+    dist_arr,angle_arr,area_arr = [],[],[]
 
     # Directories
     save_dir = Path(increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok))  # increment run
@@ -172,31 +185,38 @@ def detect(save_img=False):
                     center = get_center(xywhs)
                     distance = get_distance(center, (dx1,dy1))
                     angle = get_angle(center, (dx1,dy1))
-                    area = get_area(xywhs)   
- 
+                    area = get_area(xywhs)
 
-                    
-                    cv2.circle(img=im0, center = get_center(xywhs), radius =10, color =(255,0,0), thickness=5)
-                    cv2.line(img=im0, pt1=center, pt2=(dx1,dy1), color=colors[int(cls)], thickness=1)
-                    cv2.putText(im0,f'D:{distance:.2f}  A:{angle:.2f}',org=(dx1,dy1-10),fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=colors[int(cls)], thickness=1)
-                    cv2.putText(im0,f'Bat:{battery_level}%',org=(im_w-75,15),fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=(255,255,0), thickness=1)
-                    
-                    mng_cmd = decide_drone_movement(distance,angle,area)
-                    if mng_cmd != "":
-                        command_str = mng_cmd
+                    if len(dist_arr) <= 5:
+                        dist_arr.push(distance)
+                        angle_arr.push(angle)
+                        area_arr.push(area)  
+
+                    if len(dist_arr) >= 5:
+                        distance,angle,area = mean(dist_arr),mean(angle_arr),mean(area_arr)
+                        cv2.circle(img=im0, center = get_center(xywhs), radius =10, color =(255,0,0), thickness=5)
+                        cv2.line(img=im0, pt1=center, pt2=(dx1,dy1), color=colors[int(cls)], thickness=1)
+                        cv2.putText(im0,f'D:{distance:.2f}  A:{angle:.2f}',org=(dx1,dy1-10),fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=colors[int(cls)], thickness=1)
+                        cv2.putText(im0,f'Bat:{battery_level}%',org=(im_w-75,15),fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=(255,255,0), thickness=1)
+                        
+                        mng_cmd = decide_drone_movement(distance,angle,area)
+                        if mng_cmd != "":
+                            command_str = mng_cmd
+                        dist_arr,angle_arr,area_arr = [],[],[]
                 
                     if save_img or view_img:  # Add bbox to image
                         label = f'{int(cls)} {names[int(cls)]} {conf:.2f} D:{distance:.2f} A:{angle:.2f}'
                         plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
+                    
+                    count_no_obj = 0
             else:
-                pass
-                # count_no_obj += 1
-                # #every 5 frame if no object detected, send command rotate
-                # if count_no_obj % 5 == 0:
-                #     command_str = "rotate_clockwise:30"
+                count_no_obj += 1
+                #every 5 frame if no object detected, send command rotate
+                if count_no_obj % 5 == 0:
+                    command_str = "rotate_clockwise:30"
 
-                # if count_no_obj > 1000:
-                #     count_no_obj = 0
+                if count_no_obj > 1000:
+                    count_no_obj = 0
 
 
             # Print time (inference + NMS)
@@ -235,6 +255,7 @@ def detect(save_img=False):
         print(f"Results saved to {save_dir}{s}")
 
     print(f'Done. ({time.time() - t0:.3f}s)')
+    run_process = False
     
     
 
@@ -273,11 +294,11 @@ if __name__ == '__main__':
         # else:
         #     detect()
 
-        drone = threading.Thread(target=detect)
-        drone.start()
+        drone_det = threading.Thread(target=detect)
+        drone_det.start()
         time.sleep(2)
 
         run_tello()
 
         run_process = False
-        drone.join()
+        drone_det.join()
