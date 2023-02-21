@@ -24,9 +24,40 @@ import threading,sys
 
 run_process = True
 send_command = True
+command_data = queue.Queue()
 drone_command = False
 battery_level = 0
-command_str = ""
+tello = None
+
+
+def run_command_on_drone(command_data):
+    global run_process,send_command,battery_level
+    
+    while True:
+        data = command_data.get()
+        if ":" in data:
+            command, value = data.split(":")
+        else:
+            command = data
+            value = 0
+
+        if command is not None and send_command is True:
+            try: 
+                send_command = False 
+                res = run_command(command,int(value),tello)
+                send_command = True
+                if command == "get_battery" and int(res) is not None:
+                    battery_level = res
+            except Exception as e:
+                send_command = True
+                print(e)
+        else:
+            send_command = True
+            print("Command is None")
+        
+
+        if not run_process:
+            break
 
   
 
@@ -35,9 +66,7 @@ def detect(save_img=False):
     save_img = not opt.nosave and not source.endswith('.txt')  # save inference images
     webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
         ('rtsp://', 'rtmp://', 'http://', 'https://'))
-    global run_process,drone_command,battery_level,command_str
-    count_no_image = 0
-    c = 0
+    global run_process,command_data,drone_command,battery_level
 
     # Directories
     save_dir = Path(increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok))  # increment run
@@ -143,8 +172,7 @@ def detect(save_img=False):
                     center = get_center(xywhs)
                     distance = get_distance(center, (dx1,dy1))
                     angle = get_angle(center, (dx1,dy1))
-                    area = get_area(xywhs)   
- 
+                    area = get_area(xywhs)    
 
                     
                     cv2.circle(img=im0, center = get_center(xywhs), radius =10, color =(255,0,0), thickness=5)
@@ -152,13 +180,16 @@ def detect(save_img=False):
                     cv2.putText(im0,f'D:{distance:.2f}  A:{angle:.2f}',org=(dx1,dy1-10),fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=colors[int(cls)], thickness=1)
                     cv2.putText(im0,f'Bat:{battery_level}%',org=(im_w-75,15),fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=(255,255,0), thickness=1)
                     
+
+                    #command = decide_drone_movement(command_data,distance, angle, area)
+                    #command_data.put(command)
                 
                     if save_img or view_img:  # Add bbox to image
                         label = f'{int(cls)} {names[int(cls)]} {conf:.2f} D:{distance:.2f} A:{angle:.2f}'
                         plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
             else:
-                count_no_image = count_no_image + 1
-
+                #command_data.put("rotate_clockwise:10")
+                print("rotate clockwise")
 
             # Print time (inference + NMS)
             #print(f'{s}Done. ({(1E3 * (t2 - t1)):.1f}ms) Inference, ({(1E3 * (t3 - t2)):.1f}ms) NMS')
@@ -171,27 +202,22 @@ def detect(save_img=False):
                 key = cv2.waitKey(1) & 0xff
                 if key == 27 or key == ord('q'): # ESC or q to quit
                     run_process = False
-                    #tello.end()
+                    tello.end()
                     cv2.destroyAllWindows()
-                    sys.exit()
-            
-                if key == ord('r'):
-                    command_str = "rotate"
-                    #command_data.put("rotate")
-                if key == ord('l'):
-                    command_str = "land"
-                
-                if key == ord('b'):
-                    command_str = "battery"
-                    #command_data.put("land")
+                    return 1
 
+                if key == ord('w'):
+                    command_data.put("move_up:20")
                 if key == ord('a'):
-                    command_str = "move_left"
-                
+                    command_data.put("move_left:20")
+                if key == ord('s'):
+                    command_data.put("move_down:20")
                 if key == ord('d'):
-                    command_str = "move_right"
+                    command_data.put("move_right:20")
+                if key == ord('b'):
+                    command_data.put("get_battery")
 
-            
+
     if save_txt or save_img:
         s = f"\n{len(list(save_dir.glob('labels/*.txt')))} labels saved to {save_dir / 'labels'}" if save_txt else ''
         print(f"Results saved to {save_dir}{s}")
@@ -221,24 +247,39 @@ if __name__ == '__main__':
     parser.add_argument('--name', default='exp', help='save results to project/name')
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--no-trace', action='store_true', help='don`t trace model')
+    parser.add_argument('--no-drone', action='store_true', help='No drone')
     opt = parser.parse_args()
     print(opt)
     #check_requirements(exclude=('pycocotools', 'thop'))
-
-
-    with torch.no_grad():
-
-        drone = threading.Thread(target=detect)
-        drone.start()
-        time.sleep(2)
-
+     
+    if opt.no_drone is False:
+        # Initialize the Tello drone
         tello = Tello()
         tello.connect()
-        tello.set_video_resolution(tello.RESOLUTION_480P)
-        tello.set_video_fps(tello.FPS_30)
-        run_process = True
+        #tello.set_video_fps(tello.FPS_15)
+        #tello.set_video_resolution(tello.RESOLUTION_480P)
+        # tello.RESPONSE_TIMEOUT = 2
+        # tello.RETRY_COUNT = 2
+
+        
+        #tello.move_up(50)
+        # Start the video stream
+
         tello.streamon()
         tello.takeoff()
+        time.sleep(2)
+    else:
+        opt.source = "0"
+    
+
+    with torch.no_grad():
+        drone = threading.Thread(target=detect)
+        drone.start()
+
+        drone_command = threading.Thread(target=run_command_on_drone, args=(command_data,))
+        drone_command.start()
+    
+        # detect()
 
         # if opt.update:  # update all models (to fix SourceChangeWarning)
         #     for opt.weights in ['yolov7.pt']:
@@ -246,51 +287,3 @@ if __name__ == '__main__':
         #         strip_optimizer(opt.weights)
         # else:
         #     detect()
-
-        state = 0
-        while run_process:
-            data = command_str
-            try:
-                if data == "":
-                    if state == 1:
-                        state = 2
-                        tello.move_up(20)
-                    elif state == 2:
-                        state = 1
-                        tello.move_down(20)
-
-                if data == "land":
-                    send_command = False 
-                    print("land")
-                    tello.land()
-                    command_str = ""
-                    send_command = True
-                elif data == "rotate":
-                    send_command = False 
-                    print("rotate")
-                    tello.rotate_clockwise(30)
-                    command_str = ""
-                    send_command = False 
-                elif data == "battery":
-                    send_command = False 
-                    print("battery:",tello.get_battery())
-                    command_str = ""
-                    send_command = False 
-                elif data == "move_left":
-                    command_str = ""
-                    tello.move_left(20)
-                elif data == "move_right":
-                    command_str = ""
-                    tello.move_right(20)
-                    
-            except:
-                print("excetion")
-
-        # time.sleep(20)
-        try:
-            tello.land()
-        except:
-            pass
-
-        run_process = False
-        drone.join()
