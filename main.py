@@ -187,22 +187,22 @@ def detect(save_img=False):
                     angle = get_angle(center, (dx1,dy1))
                     area = get_area(xywhs)
 
-                    if len(dist_arr) <= 5:
-                        dist_arr.push(distance)
-                        angle_arr.push(angle)
-                        area_arr.push(area)  
+                    # if len(dist_arr) <= 5:
+                    #     dist_arr.push(distance)
+                    #     angle_arr.push(angle)
+                    #     area_arr.push(area)  
 
-                    if len(dist_arr) >= 5:
-                        distance,angle,area = mean(dist_arr),mean(angle_arr),mean(area_arr)
-                        cv2.circle(img=im0, center = get_center(xywhs), radius =10, color =(255,0,0), thickness=5)
-                        cv2.line(img=im0, pt1=center, pt2=(dx1,dy1), color=colors[int(cls)], thickness=1)
-                        cv2.putText(im0,f'D:{distance:.2f}  A:{angle:.2f}',org=(dx1,dy1-10),fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=colors[int(cls)], thickness=1)
-                        cv2.putText(im0,f'Bat:{battery_level}%',org=(im_w-75,15),fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=(255,255,0), thickness=1)
-                        
-                        mng_cmd = decide_drone_movement(distance,angle,area)
-                        if mng_cmd != "":
-                            command_str = mng_cmd
-                        dist_arr,angle_arr,area_arr = [],[],[]
+                    #if len(dist_arr) >= 5:
+                    distance,angle,area = mean(dist_arr),mean(angle_arr),mean(area_arr)
+                    cv2.circle(img=im0, center = get_center(xywhs), radius =10, color =(255,0,0), thickness=5)
+                    cv2.line(img=im0, pt1=center, pt2=(dx1,dy1), color=colors[int(cls)], thickness=1)
+                    cv2.putText(im0,f'D:{distance:.2f}  A:{angle:.2f}',org=(dx1,dy1-10),fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=colors[int(cls)], thickness=1)
+                    cv2.putText(im0,f'Bat:{battery_level}%',org=(im_w-75,15),fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=(255,255,0), thickness=1)
+                    
+                    mng_cmd = decide_drone_movement(distance,angle,area)
+                    if mng_cmd != "":
+                        command_str = mng_cmd
+                    dist_arr,angle_arr,area_arr = [],[],[]
                 
                     if save_img or view_img:  # Add bbox to image
                         label = f'{int(cls)} {names[int(cls)]} {conf:.2f} D:{distance:.2f} A:{angle:.2f}'
@@ -234,7 +234,7 @@ def detect(save_img=False):
                     sys.exit()
             
                 if key == ord('r'):
-                    command_str = "rotate"
+                    command_str = "rotate_clockwise:30"
                     #command_data.put("rotate")
                 if key == ord('l'):
                     command_str = "land"
@@ -244,10 +244,10 @@ def detect(save_img=False):
                     #command_data.put("land")
 
                 if key == ord('a'):
-                    command_str = "move_left"
+                    command_str = "move_left:20"
                 
                 if key == ord('d'):
-                    command_str = "move_right"
+                    command_str = "move_right:20"
 
             
     if save_txt or save_img:
