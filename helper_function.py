@@ -121,9 +121,20 @@ def get_angle(pointA, pointB):
 
 
 def decide_drone_movement(distance, angle, area):
+    actual_angle = angle - 90
+
     # check if object is closer than 100 cm
-    if distance < 100 and (angle >= 80 and angle <= 100):
-       return "land"
-         
+    if distance < 100 and (angle >= 85 and angle <= 95):
+        print("#landing sequence")
+        return "landing_sequence"
+    if actual_angle < 0:
+        print("rotate_counter_clockwise:"+str(abs(actual_angle)))
+        return "rotate_counter_clockwise:"+str(abs(actual_angle))
+    if actual_angle > 0:
+        print("rotate_clockwise:"+str(abs(actual_angle)))
+        return "rotate_clockwise:"+str(abs(actual_angle))
+    if distance > 100:
+        print("move_forward:"+str(20))
+        return "move_forward:"+str(20)
     
-    return 1
+    return ""

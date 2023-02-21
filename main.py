@@ -29,6 +29,51 @@ battery_level = 0
 command_str = ""
 
   
+def run_tello():
+    tello = Tello()
+    tello.connect()
+    tello.set_video_resolution(tello.RESOLUTION_480P)
+    tello.set_video_fps(tello.FPS_30)
+    tello.streamon()
+    tello.takeoff()
+
+    # if opt.update:  # update all models (to fix SourceChangeWarning)
+    #     for opt.weights in ['yolov7.pt']:
+    #         detect()
+    #         strip_optimizer(opt.weights)
+    # else:
+    #     detect()
+
+    state = 1
+    while run_process:
+        
+        try:
+            if command_str == "":
+                if state == 1:
+                    state = 2
+                    tello.move_up(20)
+                elif state == 2:
+                    state = 1
+                    tello.move_down(20)
+            else:
+                if ":" in command_str:
+                    command, value = command_str.split(":")
+                else:
+                    command,value = command_str,0
+
+                run_command(command,value,tello)
+            
+        except Exception as e:
+            print("excetion",e)
+        
+        #time.sleep(0.05)
+
+
+    try:
+        tello.land()
+    except:
+        pass
+
 
 def detect(save_img=False):
     source, weights, view_img, save_txt, imgsz, trace = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size, not opt.no_trace
@@ -36,7 +81,7 @@ def detect(save_img=False):
     webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
         ('rtsp://', 'rtmp://', 'http://', 'https://'))
     global run_process,drone_command,battery_level,command_str
-    count_no_image = 0
+    count_no_obj = 0
     c = 0
 
     # Directories
@@ -85,7 +130,15 @@ def detect(save_img=False):
     old_img_b = 1
 
     t0 = time.time()
+    n = 0
     for path, img, im0s, vid_cap in dataset:
+        # n += 1
+        # # run every 5th frame
+        # if n % 2!= 0:
+        #     continue
+        # if n > 1000:
+        #     n=0
+
         img = torch.from_numpy(img).to(device)
         img = img.half() if half else img.float()  # uint8 to fp16/32
         img /= 255.0  # 0 - 255 to 0.0 - 1.0
@@ -152,12 +205,22 @@ def detect(save_img=False):
                     cv2.putText(im0,f'D:{distance:.2f}  A:{angle:.2f}',org=(dx1,dy1-10),fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=colors[int(cls)], thickness=1)
                     cv2.putText(im0,f'Bat:{battery_level}%',org=(im_w-75,15),fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=(255,255,0), thickness=1)
                     
+                    mng_cmd = decide_drone_movement(distance,angle,area)
+                    if mng_cmd != "":
+                        command_str = mng_cmd
                 
                     if save_img or view_img:  # Add bbox to image
                         label = f'{int(cls)} {names[int(cls)]} {conf:.2f} D:{distance:.2f} A:{angle:.2f}'
                         plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
             else:
-                count_no_image = count_no_image + 1
+                pass
+                # count_no_obj += 1
+                # #every 5 frame if no object detected, send command rotate
+                # if count_no_obj % 5 == 0:
+                #     command_str = "rotate_clockwise:30"
+
+                # if count_no_obj > 1000:
+                #     count_no_obj = 0
 
 
             # Print time (inference + NMS)
@@ -227,70 +290,11 @@ if __name__ == '__main__':
 
 
     with torch.no_grad():
-
         drone = threading.Thread(target=detect)
         drone.start()
         time.sleep(2)
 
-        tello = Tello()
-        tello.connect()
-        tello.set_video_resolution(tello.RESOLUTION_480P)
-        tello.set_video_fps(tello.FPS_30)
-        run_process = True
-        tello.streamon()
-        tello.takeoff()
-
-        # if opt.update:  # update all models (to fix SourceChangeWarning)
-        #     for opt.weights in ['yolov7.pt']:
-        #         detect()
-        #         strip_optimizer(opt.weights)
-        # else:
-        #     detect()
-
-        state = 0
-        while run_process:
-            data = command_str
-            try:
-                if data == "":
-                    if state == 1:
-                        state = 2
-                        tello.move_up(20)
-                    elif state == 2:
-                        state = 1
-                        tello.move_down(20)
-
-                if data == "land":
-                    send_command = False 
-                    print("land")
-                    tello.land()
-                    command_str = ""
-                    send_command = True
-                elif data == "rotate":
-                    send_command = False 
-                    print("rotate")
-                    tello.rotate_clockwise(30)
-                    command_str = ""
-                    send_command = False 
-                elif data == "battery":
-                    send_command = False 
-                    print("battery:",tello.get_battery())
-                    command_str = ""
-                    send_command = False 
-                elif data == "move_left":
-                    command_str = ""
-                    tello.move_left(20)
-                elif data == "move_right":
-                    command_str = ""
-                    tello.move_right(20)
-                    
-            except:
-                print("excetion")
-
-        # time.sleep(20)
-        try:
-            tello.land()
-        except:
-            pass
+        run_tello()
 
         run_process = False
         drone.join()
